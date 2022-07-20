@@ -12,11 +12,6 @@ namespace Microsoft.Extensions.DependencyInjection
 
         private static AutomaticApiControllerFeatureProvider _automaticApiControllerFeatureProvider;
 
-        public static IServiceCollection AddAutomaticApi(this IServiceCollection services)
-        {
-            return services.AddAutomaticApi(null);
-        }
-
         public static IServiceCollection AddAutomaticApi(this IServiceCollection services, Action<AutomaticApiOptions> setupAction)
         {
             setupAction?.Invoke(_options);
