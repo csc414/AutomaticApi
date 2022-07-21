@@ -82,16 +82,37 @@ namespace AutomaticApi
         }
 
         /// <summary>
-        /// Add Type.
-        /// It can be a Interface or Class based on <see cref="IAutomaticApi"/>.
+        /// Add Implementation Type.
         /// </summary>
-        /// <typeparam name="T"></typeparam>
+        /// <typeparam name="TImplementation"></typeparam>
         /// <returns></returns>
-        public AutomaticApiOptions AddApi<T>() where T : IAutomaticApi
+        /// <exception cref="ArgumentException"></exception>
+        public AutomaticApiOptions AddService<TImplementation>() where TImplementation : class, IAutomaticApi
         {
-            var t = typeof(T);
-            if (t == typeof(IAutomaticApi))
-                throw new ArgumentException($"{t.FullName} can't be a AutomaticApi");
+            var t = typeof(TImplementation);
+            if (t.IsInterface)
+                throw new ArgumentException($"{nameof(TImplementation)} must be a Class");
+
+            AllowedTypes.Add(t);
+            return this;
+        }
+
+        /// <summary>
+        /// Add ApiService Type and Implementation Type.
+        /// </summary>
+        /// <typeparam name="TApiService"></typeparam>
+        /// <typeparam name="TImplementation"></typeparam>
+        /// <returns></returns>
+        /// <exception cref="ArgumentException"></exception>
+        public AutomaticApiOptions AddService<TApiService, TImplementation>() where TApiService : IAutomaticApi where TImplementation : class, TApiService
+        {
+            var t = typeof(TApiService);
+            if (!t.IsInterface)
+                throw new ArgumentException($"{nameof(TApiService)} must be a Interface based on IAutomaticApi");
+
+            var tt = typeof(TImplementation);
+            if (!tt.IsClass)
+                throw new ArgumentException($"{nameof(TImplementation)} must be a Class based on {nameof(TApiService)}");
 
             AllowedTypes.Add(t);
             return this;
