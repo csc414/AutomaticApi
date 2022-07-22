@@ -2,17 +2,16 @@
 using Microsoft.AspNetCore.Mvc.Infrastructure;
 using Microsoft.AspNetCore.Mvc.Routing;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 using System;
-using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using System.Reflection.Emit;
-using System.Text;
 using System.Text.RegularExpressions;
 
-namespace AutomaticApi
+namespace AutomaticApi.Dynamic
 {
-    public sealed class DynamicControllerBuilder
+    internal sealed class DynamicControllerBuilder
     {
         private readonly MethodInfo _getServiceOrCreateInstance = typeof(ActivatorUtilities).GetTypeInfo().DeclaredMethods.First(o => o.Name.Equals("GetServiceOrCreateInstance"));
 
@@ -20,37 +19,29 @@ namespace AutomaticApi
 
         private readonly ModuleBuilder _mb;
 
-        private readonly AutomaticApiOptions _options;
+        private AutomaticApiOptions _options;
 
-        private readonly Regex _controllerNameRegex;
+        private Regex _controllerNameRegex;
 
-        private readonly Regex _nameRegex;
+        private Regex _nameRegex;
 
-        private readonly Regex _routeRegex;
+        private Regex _routeRegex;
 
-        public DynamicControllerBuilder(AutomaticApiOptions options, string assemblyName)
+        public DynamicControllerBuilder(string assemblyName)
         {
-            _options = options;
-
-            _controllerNameRegex = new Regex($"^(?:I)(.+?)(?:{string.Join("|", options.ApiNameSuffixes)})?$", RegexOptions.CultureInvariant | RegexOptions.Singleline | RegexOptions.Compiled);
-
-            _nameRegex = new Regex($"^({string.Join("|", options.HttpMethodVerbs.Keys)})?(.*?)(?:Async)?$", RegexOptions.CultureInvariant | RegexOptions.Singleline | RegexOptions.Compiled);
-
-            _routeRegex = new Regex("[A-Z]{0,1}[a-z0-9]+", RegexOptions.CultureInvariant | RegexOptions.Singleline | RegexOptions.Compiled);
-
             AssemblyName name = new AssemblyName(assemblyName);
             _ab = AssemblyBuilder.DefineDynamicAssembly(name, AssemblyBuilderAccess.RunAndCollect);
             _mb = _ab.DefineDynamicModule(name.Name);
         }
 
-        public void AddAssembly(Assembly assembly)
+        private void AddAssembly(Assembly assembly)
         {
             var types = assembly.DefinedTypes.Where(o => o.IsClass && !o.IsAbstract && !o.IsGenericType && typeof(IAutomaticApi).IsAssignableFrom(o)).ToArray();
             foreach (var type in types)
                 AddImplementationType(type);
         }
 
-        public void AddImplementationType(TypeInfo implementationType)
+        private void AddImplementationType(TypeInfo implementationType)
         {
             var definedInterfaces = implementationType.ImplementedInterfaces.Except
                             (implementationType.ImplementedInterfaces.SelectMany(t => t.GetInterfaces()))
@@ -59,22 +50,25 @@ namespace AutomaticApi
                 AddController(type.GetTypeInfo(), implementationType);
         }
 
-        public void AddController(TypeInfo definedType, TypeInfo implementationType)
+        private void AddController(TypeInfo definedType, TypeInfo implementationType)
         {
             var controllerName = GetControllerName(definedType.Name);
 
             if (definedType.Namespace != null)
                 controllerName = $"{definedType.Namespace}.{controllerName}";
 
-            var controllerBuilder = _mb.DefineType(controllerName, TypeAttributes.Public, typeof(ControllerBase), new[] { definedType });
-            var typeAttributes = definedType.GetCustomAttributes();
-            if (!typeAttributes.Any(o => o is IRouteTemplateProvider p && p.Template != null))
-                controllerBuilder.SetCustomAttribute(CreateAttribute<RouteAttribute>("api/[controller]"));
+            if (_mb.GetType(controllerName) != null)
+                return;
+
+            var controllerBuilder = _mb.DefineType(controllerName, TypeAttributes.Public, _options.ControllerBaseType, new[] { definedType });
+            var typeAttributes = definedType.GetCustomAttributes(true);
+            if (!string.IsNullOrWhiteSpace(_options.DefaultRouteTemplate) && !typeAttributes.Any(o => o is IRouteTemplateProvider p && p.Template != null))
+                controllerBuilder.SetCustomAttribute(CreateAttribute<RouteAttribute>(_options.DefaultRouteTemplate));
             if (_options.UseApiBehavior && !typeAttributes.Any(o => o is IApiBehaviorMetadata))
                 controllerBuilder.SetCustomAttribute(CreateAttribute<ApiControllerAttribute>());
 
             var serviceField = controllerBuilder.DefineField("_service", definedType, FieldAttributes.Private);
-            
+
             var ctorBuilder = controllerBuilder.DefineConstructor(MethodAttributes.Public, CallingConventions.Standard, new[] { typeof(IServiceProvider) });
             var ctorIL = ctorBuilder.GetILGenerator();
             ctorIL.Emit(OpCodes.Ldarg_0);
@@ -155,6 +149,28 @@ namespace AutomaticApi
             }
 
             controllerBuilder.CreateType();
+        }
+
+        public void AddControllersFromOptions(AutomaticApiOptions options)
+        {
+            _options = options;
+
+            _controllerNameRegex = new Regex($"^(?:I)(.+?)(?:{string.Join("|", options.AllowedNameSuffixes)})?$", RegexOptions.CultureInvariant | RegexOptions.Singleline | RegexOptions.Compiled);
+
+            _nameRegex = new Regex($"^({string.Join("|", options.HttpMethodVerbs.Keys)})?(.*?)(?:Async)?$", RegexOptions.CultureInvariant | RegexOptions.Singleline | RegexOptions.Compiled);
+
+            _routeRegex = new Regex("[A-Z]{0,1}[a-z0-9]+", RegexOptions.CultureInvariant | RegexOptions.Singleline | RegexOptions.Compiled);
+
+            foreach (var assembly in _options.AllowedAssemblies)
+                AddAssembly(assembly);
+
+            foreach (var descriptor in _options.AllowedDescriptors)
+            {
+                if (descriptor.ApiServiceType == null)
+                    AddImplementationType(descriptor.ImplementationType.GetTypeInfo());
+                else if (descriptor.ImplementationType != null)
+                    AddController(descriptor.ApiServiceType.GetTypeInfo(), descriptor.ImplementationType.GetTypeInfo());
+            }
         }
 
         public Assembly GetAssembly() => _ab;

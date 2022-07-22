@@ -1,7 +1,7 @@
 ﻿using Microsoft.AspNetCore.Mvc.Routing;
 using System;
 
-namespace AutomaticApi
+namespace AutomaticApi.Dynamic
 {
     [AttributeUsage(AttributeTargets.Method, AllowMultiple = true, Inherited = true)]
     public class AutomaticApiHttpMethodAttribute : HttpMethodAttribute

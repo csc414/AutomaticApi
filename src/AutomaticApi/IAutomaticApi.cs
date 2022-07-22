@@ -1,6 +1,4 @@
 ﻿namespace AutomaticApi
 {
-    public interface IAutomaticApi
-    {
-    }
+    public interface IAutomaticApi { }
 }
