@@ -19,11 +19,11 @@ namespace TestApi
 
             services.AddAutomaticApi(op =>
             {
+                op.AddApi<IDemoAService, TestService>(typeof(BaseController)); //only IDemoAService
+
+                op.AddApi<TestService>(); //Generate all api in TestService
+
                 //op.AddAssembly(Assembly.GetEntryAssembly()); //Generate all api in Assembly
-
-                //op.AddApi<TestService>(); //Generate all api in TestService
-
-                op.AddApi<IDemoAService, TestService>(); //only IDemoAService
             });
         }
 

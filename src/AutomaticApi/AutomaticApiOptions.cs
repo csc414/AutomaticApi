@@ -2,6 +2,7 @@
 using Microsoft.AspNetCore.Mvc;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Reflection;
 
 namespace AutomaticApi
@@ -36,14 +37,7 @@ namespace AutomaticApi
             AllowedNameSuffixes = new HashSet<string> { "Service", "ApiService", "AutoApiService" };
         }
 
-        private readonly HashSet<Assembly> _allowedAssemblies = new();
-
         private readonly HashSet<AutomaticApiDescriptor> _allowedDescriptors = new();
-
-        /// <summary>
-        /// Allowed assemblies.
-        /// </summary>
-        public IEnumerable<Assembly> AllowedAssemblies => _allowedAssemblies;
 
         /// <summary>
         /// Allowed descriptors.
@@ -94,9 +88,13 @@ namespace AutomaticApi
         /// </summary>
         /// <param name="assembly"></param>
         /// <returns></returns>
-        public AutomaticApiOptions AddAssembly(Assembly assembly)
+        public AutomaticApiOptions AddAssembly(Assembly assembly, Type controllerBaseType = null)
         {
-            _allowedAssemblies.Add(assembly);
+            CheckControllerBaseType(controllerBaseType);
+
+            var types = assembly.DefinedTypes.Where(o => o.IsClass && !o.IsAbstract && !o.IsGenericType && typeof(IAutomaticApi).IsAssignableFrom(o)).ToArray();
+            foreach (var t in types)
+                _allowedDescriptors.Add(new AutomaticApiDescriptor(t, controllerBaseType));
             return this;
         }
 
@@ -104,15 +102,14 @@ namespace AutomaticApi
         /// Add Implementation Type.
         /// </summary>
         /// <typeparam name="TImplementation"></typeparam>
+        /// <param name="controllerBaseType"></param>
         /// <returns></returns>
         /// <exception cref="ArgumentException"></exception>
-        public AutomaticApiOptions AddApi<TImplementation>() where TImplementation : class, IAutomaticApi
+        public AutomaticApiOptions AddApi<TImplementation>(Type controllerBaseType = null) where TImplementation : class, IAutomaticApi
         {
-            var t = typeof(TImplementation);
-            if (t.IsInterface)
-                throw new ArgumentException($"{nameof(TImplementation)} must be a Class");
+            CheckControllerBaseType(controllerBaseType);
 
-            _allowedDescriptors.Add(new AutomaticApiDescriptor(t));
+            _allowedDescriptors.Add(new AutomaticApiDescriptor(typeof(TImplementation), controllerBaseType));
             return this;
         }
 
@@ -121,20 +118,25 @@ namespace AutomaticApi
         /// </summary>
         /// <typeparam name="TApiService"></typeparam>
         /// <typeparam name="TImplementation"></typeparam>
+        /// <param name="controllerBaseType"></param>
         /// <returns></returns>
         /// <exception cref="ArgumentException"></exception>
-        public AutomaticApiOptions AddApi<TApiService, TImplementation>() where TApiService : IAutomaticApi where TImplementation : class, TApiService
+        public AutomaticApiOptions AddApi<TApiService, TImplementation>(Type controllerBaseType = null) where TApiService : IAutomaticApi where TImplementation : class, TApiService
         {
             var t = typeof(TApiService);
             if (!t.IsInterface)
                 throw new ArgumentException($"{nameof(TApiService)} must be a Interface based on IAutomaticApi");
 
-            var tt = typeof(TImplementation);
-            if (!tt.IsClass)
-                throw new ArgumentException($"{nameof(TImplementation)} must be a Class based on {nameof(TApiService)}");
+            CheckControllerBaseType(controllerBaseType);
 
-            _allowedDescriptors.Add(new AutomaticApiDescriptor(t, tt));
+            _allowedDescriptors.Add(new AutomaticApiDescriptor(t, typeof(TImplementation), controllerBaseType));
             return this;
+        }
+
+        void CheckControllerBaseType(Type controllerBaseType)
+        {
+            if (controllerBaseType != null && !typeof(ControllerBase).IsAssignableFrom(controllerBaseType))
+                throw new ArgumentException($"{nameof(controllerBaseType)} must based on ControllerBase");
         }
     }
 }

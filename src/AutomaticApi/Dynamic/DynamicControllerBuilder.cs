@@ -34,23 +34,16 @@ namespace AutomaticApi.Dynamic
             _mb = _ab.DefineDynamicModule(name.Name);
         }
 
-        private void AddAssembly(Assembly assembly)
-        {
-            var types = assembly.DefinedTypes.Where(o => o.IsClass && !o.IsAbstract && !o.IsGenericType && typeof(IAutomaticApi).IsAssignableFrom(o)).ToArray();
-            foreach (var type in types)
-                AddImplementationType(type);
-        }
-
-        private void AddImplementationType(TypeInfo implementationType)
+        private void AddImplementationType(TypeInfo implementationType, Type controllerBaseType = null)
         {
             var definedInterfaces = implementationType.ImplementedInterfaces.Except
                             (implementationType.ImplementedInterfaces.SelectMany(t => t.GetInterfaces()))
                             .Where(o => typeof(IAutomaticApi).IsAssignableFrom(o)).ToArray();
             foreach (var type in definedInterfaces)
-                AddController(type.GetTypeInfo(), implementationType);
+                AddController(type.GetTypeInfo(), implementationType, controllerBaseType);
         }
 
-        private void AddController(TypeInfo definedType, TypeInfo implementationType)
+        private void AddController(TypeInfo definedType, TypeInfo implementationType, Type controllerBaseType = null)
         {
             var controllerName = GetControllerName(definedType.Name);
 
@@ -60,7 +53,7 @@ namespace AutomaticApi.Dynamic
             if (_mb.GetType(controllerName) != null)
                 return;
 
-            var controllerBuilder = _mb.DefineType(controllerName, TypeAttributes.Public, _options.ControllerBaseType, new[] { definedType });
+            var controllerBuilder = _mb.DefineType(controllerName, TypeAttributes.Public, controllerBaseType ?? _options.ControllerBaseType, new[] { definedType });
             var typeAttributes = definedType.GetCustomAttributes(true);
             if (!string.IsNullOrWhiteSpace(_options.DefaultRouteTemplate) && !typeAttributes.Any(o => o is IRouteTemplateProvider p && p.Template != null))
                 controllerBuilder.SetCustomAttribute(CreateAttribute<RouteAttribute>(_options.DefaultRouteTemplate));
@@ -161,15 +154,12 @@ namespace AutomaticApi.Dynamic
 
             _routeRegex = new Regex("[A-Z]{0,1}[a-z0-9]+", RegexOptions.CultureInvariant | RegexOptions.Singleline | RegexOptions.Compiled);
 
-            foreach (var assembly in _options.AllowedAssemblies)
-                AddAssembly(assembly);
-
             foreach (var descriptor in _options.AllowedDescriptors)
             {
                 if (descriptor.ApiServiceType == null)
                     AddImplementationType(descriptor.ImplementationType.GetTypeInfo());
                 else if (descriptor.ImplementationType != null)
-                    AddController(descriptor.ApiServiceType.GetTypeInfo(), descriptor.ImplementationType.GetTypeInfo());
+                    AddController(descriptor.ApiServiceType.GetTypeInfo(), descriptor.ImplementationType.GetTypeInfo(), descriptor.ControllerBaseType);
             }
         }
 
