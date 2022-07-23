@@ -1,0 +1,21 @@
+<Project>
+	<PropertyGroup>
+		<Authors>cxc</Authors>
+		<Description>AutomaticApi can automatically generate APIs based on services, just define a rest api interface.</Description>
+		<PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
+		<PackageIcon>logo.png</PackageIcon>
+		<RepositoryType>git</RepositoryType>
+		<RepositoryUrl>https://github.com/csc414/AutomaticApi</RepositoryUrl>
+		<PackageProjectUrl>https://github.com/csc414/AutomaticApi</PackageProjectUrl>
+		<PackageLicenseExpression>MIT</PackageLicenseExpression>
+		<PublishRepositoryUrl>true</PublishRepositoryUrl>
+		<LangVersion>10.0</LangVersion>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<None Include="../../logo.png">
+			<Pack>True</Pack>
+			<PackagePath></PackagePath>
+		</None>
+	</ItemGroup>
+</Project>

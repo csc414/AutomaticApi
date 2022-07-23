@@ -11,6 +11,8 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "AutomaticApi", "src\Automat
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "TestApi", "examples\TestApi\TestApi.csproj", "{68A37348-7AE1-4230-9439-F8399A1D7D97}"
 EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "AutomaticApi.Abstraction", "src\AutomaticApi.Abstraction\AutomaticApi.Abstraction.csproj", "{CDC1B41A-185B-4F72-914B-9D6F30984CAC}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -25,6 +27,10 @@ Global
 		{68A37348-7AE1-4230-9439-F8399A1D7D97}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{68A37348-7AE1-4230-9439-F8399A1D7D97}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{68A37348-7AE1-4230-9439-F8399A1D7D97}.Release|Any CPU.Build.0 = Release|Any CPU
+		{CDC1B41A-185B-4F72-914B-9D6F30984CAC}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{CDC1B41A-185B-4F72-914B-9D6F30984CAC}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{CDC1B41A-185B-4F72-914B-9D6F30984CAC}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{CDC1B41A-185B-4F72-914B-9D6F30984CAC}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -32,6 +38,7 @@ Global
 	GlobalSection(NestedProjects) = preSolution
 		{4639034B-F59C-4C3B-AF33-B2CEC2A18CF4} = {7A237C19-0A65-4370-AB07-D787B925C2C0}
 		{68A37348-7AE1-4230-9439-F8399A1D7D97} = {7ED559E4-9621-42D6-A0C9-A3980B4AE945}
+		{CDC1B41A-185B-4F72-914B-9D6F30984CAC} = {7A237C19-0A65-4370-AB07-D787B925C2C0}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {E7F36916-0C4C-44C5-A54D-905544D90D2B}
