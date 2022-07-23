@@ -63,9 +63,9 @@ public void ConfigureServices(IServiceCollection services)
 {
     services.AddAutomaticApi(op =>
     {
-        op.AddApi<IDemoAService, TestService>(); //only generate IDemoAService
+        op.AddApi<IDemoAService, DemoService>(); //only generate IDemoAService
 
-        op.AddApi<TestService>(); //Generate all api interface in TestService 
+        op.AddApi<DemoService>(); //Generate all api interface in DemoService 
 
         op.AddAssembly(Assembly.GetEntryAssembly()); //Generate all api interface in Assembly
     });
