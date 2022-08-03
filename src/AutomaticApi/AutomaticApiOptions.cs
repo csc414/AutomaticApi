@@ -68,6 +68,11 @@ namespace AutomaticApi
         public string DefaultRouteTemplate { get; set; } = "api/[controller]";
 
         /// <summary>
+        /// Dynamic Controller CustomAttributes
+        /// </summary>
+        public ICollection<Attribute> ControllerAttributes { get; } = new HashSet<Attribute>();
+
+        /// <summary>
         /// Dynamic Controller parent type.
         /// The default value is <see cref="ControllerBase"/>
         /// </summary>
@@ -88,13 +93,12 @@ namespace AutomaticApi
         /// </summary>
         /// <param name="assembly"></param>
         /// <returns></returns>
-        public AutomaticApiOptions AddAssembly(Assembly assembly, Type controllerBaseType = null)
+        public AutomaticApiOptions AddAssembly(Assembly assembly, Func<AutomaticApiDescriptor, bool> predicate = null)
         {
-            CheckControllerBaseType(controllerBaseType);
-
+            predicate ??= _ => true;
             var types = assembly.DefinedTypes.Where(o => o.IsClass && !o.IsAbstract && !o.IsGenericType && typeof(IAutomaticApi).IsAssignableFrom(o)).ToArray();
             foreach (var t in types)
-                _allowedDescriptors.Add(new AutomaticApiDescriptor(t, controllerBaseType));
+                AddApi(t, predicate);
             return this;
         }
 
@@ -102,15 +106,29 @@ namespace AutomaticApi
         /// Add Implementation Type.
         /// </summary>
         /// <typeparam name="TImplementation"></typeparam>
-        /// <param name="controllerBaseType"></param>
+        /// <param name="configure"></param>
         /// <returns></returns>
-        /// <exception cref="ArgumentException"></exception>
-        public AutomaticApiOptions AddApi<TImplementation>(Type controllerBaseType = null) where TImplementation : class, IAutomaticApi
+        public AutomaticApiOptions AddApi<TImplementation>(Func<AutomaticApiDescriptor, bool> predicate = null) where TImplementation : class, IAutomaticApi
         {
-            CheckControllerBaseType(controllerBaseType);
-
-            _allowedDescriptors.Add(new AutomaticApiDescriptor(typeof(TImplementation), controllerBaseType));
+            AddApi(typeof(TImplementation).GetTypeInfo(), predicate);
             return this;
+        }
+
+        void AddApi(TypeInfo implementationType, Func<AutomaticApiDescriptor, bool> predicate = null)
+        {
+            predicate ??= _ => true;
+            var definedInterfaces = implementationType.ImplementedInterfaces.Except
+                (implementationType.ImplementedInterfaces.SelectMany(t => t.GetInterfaces()))
+                .Where(o => typeof(IAutomaticApi).IsAssignableFrom(o)).ToArray();
+            foreach (var type in definedInterfaces)
+            {
+                var descriptor = new AutomaticApiDescriptor(type, implementationType);
+                if (predicate(descriptor))
+                {
+                    Check(descriptor);
+                    _allowedDescriptors.Add(descriptor);
+                }
+            }
         }
 
         /// <summary>
@@ -118,25 +136,25 @@ namespace AutomaticApi
         /// </summary>
         /// <typeparam name="TApiService"></typeparam>
         /// <typeparam name="TImplementation"></typeparam>
-        /// <param name="controllerBaseType"></param>
+        /// <param name="configure"></param>
         /// <returns></returns>
         /// <exception cref="ArgumentException"></exception>
-        public AutomaticApiOptions AddApi<TApiService, TImplementation>(Type controllerBaseType = null) where TApiService : IAutomaticApi where TImplementation : class, TApiService
+        public AutomaticApiOptions AddApi<TApiService, TImplementation>(Action<AutomaticApiDescriptor> configure = null) where TApiService : IAutomaticApi where TImplementation : class, TApiService
         {
             var t = typeof(TApiService);
             if (!t.IsInterface)
                 throw new ArgumentException($"{nameof(TApiService)} must be a Interface based on IAutomaticApi");
-
-            CheckControllerBaseType(controllerBaseType);
-
-            _allowedDescriptors.Add(new AutomaticApiDescriptor(t, typeof(TImplementation), controllerBaseType));
+            var descriptor = new AutomaticApiDescriptor(t, typeof(TImplementation));
+            configure?.Invoke(descriptor);
+            Check(descriptor);
+            _allowedDescriptors.Add(descriptor);
             return this;
         }
 
-        void CheckControllerBaseType(Type controllerBaseType)
+        void Check(AutomaticApiDescriptor descriptor)
         {
-            if (controllerBaseType != null && !typeof(ControllerBase).IsAssignableFrom(controllerBaseType))
-                throw new ArgumentException($"{nameof(controllerBaseType)} must based on ControllerBase");
+            if (descriptor.ControllerBaseType != null && !typeof(ControllerBase).IsAssignableFrom(descriptor.ControllerBaseType))
+                throw new ArgumentException($"{nameof(descriptor.ControllerBaseType)} must based on ControllerBase");
         }
     }
 }

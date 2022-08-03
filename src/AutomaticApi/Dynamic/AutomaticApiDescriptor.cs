@@ -6,21 +6,26 @@ namespace AutomaticApi.Dynamic
 {
     public class AutomaticApiDescriptor
     {
-        public AutomaticApiDescriptor(Type implementationType, Type controllerBaseType)
-        {
-            ImplementationType = implementationType;
-            ControllerBaseType = controllerBaseType;
-        }
-
-        public AutomaticApiDescriptor(Type apiServiceType, Type implementationType, Type controllerBaseType) : this(implementationType, controllerBaseType)
+        public AutomaticApiDescriptor(Type apiServiceType, Type implementationType)
         {
             ApiServiceType = apiServiceType;
+            ImplementationType = implementationType;
         }
 
         public Type ApiServiceType { get; }
 
         public Type ImplementationType { get; }
 
-        public Type ControllerBaseType { get; }
+        public string ControllerName { get; set; }
+
+        public Type ControllerBaseType { get; set; }
+
+        public bool SuppressGlobalControllerAttributes { get; set; }
+
+        public bool SuppressDefaultRouteTemplate { get; set; }
+
+        public bool SuppressApiBehavior { get; set; }
+
+        public ICollection<Attribute> ControllerAttributes { get; } = new HashSet<Attribute>();
     }
 }

@@ -1,6 +1,8 @@
-﻿using Microsoft.OpenApi.Models;
+﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.OpenApi.Models;
 using System.Reflection;
 using TestApi.Api;
+using TestApi.Entities;
 using TestApi.Services;
 
 namespace TestApi
@@ -19,7 +21,16 @@ namespace TestApi
 
             services.AddAutomaticApi(op =>
             {
-                op.AddApi<IDemoAService, TestService>(typeof(BaseController)); //only IDemoAService
+                op.UseApiBehavior = false;
+                op.DefaultRouteTemplate = null;
+                op.ControllerAttributes.Add(new ApiControllerAttribute());
+                op.ControllerAttributes.Add(new RouteAttribute("api/[controller]"));
+
+                op.AddApi<IGeneralService<Student>, GenericService<Student>>(descriptor => descriptor.ControllerName = nameof(Student));
+
+                op.AddApi<IGeneralService<Class>, GenericService<Class>>(descriptor => descriptor.ControllerName = nameof(Class));
+
+                op.AddApi<IDemoAService, TestService>(descriptor => descriptor.ControllerBaseType = typeof(BaseController)); //only IDemoAService
 
                 op.AddApi<TestService>(); //Generate all api in TestService
 
