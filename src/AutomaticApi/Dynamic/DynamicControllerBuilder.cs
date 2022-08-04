@@ -5,6 +5,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using System;
 using System.Linq;
+using System.Linq.Expressions;
 using System.Reflection;
 using System.Reflection.Emit;
 using System.Text.RegularExpressions;
@@ -47,21 +48,43 @@ namespace AutomaticApi.Dynamic
                 return;
 
             var controllerBuilder = _mb.DefineType(controllerName, TypeAttributes.Public, descriptor.ControllerBaseType ?? _options.ControllerBaseType, new[] { definedType });
-            var typeAttributes = definedType.GetCustomAttributes(true).Concat(descriptor.ControllerAttributes);
-            if (!descriptor.SuppressGlobalControllerAttributes)
-                typeAttributes = typeAttributes.Concat(_options.ControllerAttributes);
+            var typeAttributes = definedType.GetInterfaces().SelectMany(o => o.GetCustomAttributes())
+                .Concat(definedType.GetCustomAttributes())
+                .Concat(descriptor.ControllerAttributes.Select(o => o.Compile().Invoke()))
+                .ToArray();
+            var typeAttributeDatas = definedType.GetInterfaces().SelectMany(o => o.GetCustomAttributesData()).Concat(definedType.GetCustomAttributesData()).ToArray();
+            foreach (var attrData in typeAttributeDatas)
+            {
+                controllerBuilder.SetCustomAttribute(CreateAttribute(attrData));
+            }
+
+            if(!descriptor.SuppressGlobalControllerAttributes)
+            {
+                typeAttributes = typeAttributes.Concat(_options.ControllerAttributes.Select(o => o.Compile().Invoke())).ToArray();
+
+                foreach (var item in _options.ControllerAttributes)
+                {
+                    var attr = CreateAttribute(item);
+                    if(attr != null)
+                        controllerBuilder.SetCustomAttribute(attr);
+                }
+            }
+
+            foreach (var item in descriptor.ControllerAttributes)
+            {
+                var attr = CreateAttribute(item);
+                if (attr != null)
+                    controllerBuilder.SetCustomAttribute(attr);
+            }
 
             if (!descriptor.SuppressDefaultRouteTemplate && !string.IsNullOrWhiteSpace(_options.DefaultRouteTemplate) && !typeAttributes.Any(o => o is IRouteTemplateProvider p && p.Template != null))
             {
                 controllerBuilder.SetCustomAttribute(CreateAttribute<RouteAttribute>(_options.DefaultRouteTemplate));
             }
+
             if (!descriptor.SuppressApiBehavior && _options.UseApiBehavior && !typeAttributes.Any(o => o is IApiBehaviorMetadata))
             {
                 controllerBuilder.SetCustomAttribute(CreateAttribute<ApiControllerAttribute>());
-            }
-            foreach (Attribute item in typeAttributes)
-            {
-                //TODO: Bind CustomAttribute
             }
 
             var serviceField = controllerBuilder.DefineField("_service", definedType, FieldAttributes.Private);
@@ -182,6 +205,86 @@ namespace AutomaticApi.Dynamic
             return new CustomAttributeBuilder(attrData.Constructor, attrData.ConstructorArguments.Select(o => o.Value).ToArray(), properties.Select(o => (PropertyInfo)o.MemberInfo).ToArray(), properties.Select(o => o.TypedValue.Value).ToArray(), fields.Select(o => (FieldInfo)o.MemberInfo).ToArray(), fields.Select(o => o.TypedValue.Value).ToArray());
         }
 
+        CustomAttributeBuilder CreateAttribute(LambdaExpression lambda)
+        {
+            if (lambda.Body.NodeType != ExpressionType.New && lambda.Body.NodeType != ExpressionType.MemberInit)
+                return null;
+
+            var memberInitExp = lambda.Body as MemberInitExpression;
+            var newExp = memberInitExp?.NewExpression ?? lambda.Body as NewExpression;
+            var constructorArgs = newExp.Arguments.Select(o => GetValue(o)).ToArray();
+
+            if (memberInitExp == null)
+                return new CustomAttributeBuilder(newExp.Constructor, constructorArgs);
+
+            var memberInfos = memberInitExp.Bindings.Where(o => o.Member.MemberType == MemberTypes.Property && o.BindingType == MemberBindingType.Assignment).Select(o => (Property: (PropertyInfo)o.Member, Value: GetValue(((MemberAssignment)o).Expression))).ToArray();
+            
+            return new CustomAttributeBuilder(newExp.Constructor, constructorArgs, memberInfos.Select(o => o.Property).ToArray(), memberInfos.Select(o => o.Value).ToArray());
+        }
+
+        object GetValue(Expression expression)
+        {
+            if (expression == null)
+                return null;
+
+            if (expression.NodeType == ExpressionType.Convert)
+                return GetValue(((UnaryExpression)expression).Operand);
+
+            if (expression.NodeType == ExpressionType.Constant)
+                return ((ConstantExpression)expression).Value;
+
+            if (expression is MemberExpression memberExpression)
+            {
+                var obj = GetValue(memberExpression.Expression);
+                if (memberExpression.Member is PropertyInfo propertyInfo)
+                    return propertyInfo.GetValue(obj);
+
+                if (memberExpression.Member is FieldInfo fieldInfo)
+                    return fieldInfo.GetValue(obj);
+            }
+
+            if (expression is MethodCallExpression methodCallExpression)
+            {
+                var args = methodCallExpression.Arguments.Select(o => GetValue(o)).ToArray();
+                object obj = null;
+                if (methodCallExpression.Object != null)
+                    obj = GetValue(methodCallExpression.Object);
+                return methodCallExpression.Method.Invoke(obj, args);
+            }
+
+            if (expression is NewArrayExpression newArrayExpression)
+            {
+                var args = newArrayExpression.Expressions.Select(o => GetValue(o)).ToArray();
+                var ary = (object[])Activator.CreateInstance(newArrayExpression.Type, args.Length);
+                for (int i = 0; i < ary.Length; ++i)
+                    ary[i] = args[i];
+                return ary;
+            }
+
+            if (expression is BinaryExpression binaryExpression)
+            {
+                switch (expression.NodeType)
+                {
+                    case ExpressionType.Coalesce:
+                        {
+                            var value = GetValue(binaryExpression.Left);
+                            if (value == null)
+                                value = GetValue(binaryExpression.Right);
+                            return value;
+                        }
+                    case ExpressionType.ArrayIndex:
+                        {
+                            var array = (Array)GetValue(binaryExpression.Left);
+                            var index = (long)Convert.ChangeType(GetValue(binaryExpression.Right), typeof(long));
+                            return array.GetValue(index);
+                        }
+                }
+
+            }
+
+            throw new NotImplementedException($"NodeType：{expression.NodeType}");
+        }
+
         string GetControllerName(string apiName)
         {
             var match = _controllerNameRegex.Match(apiName);
@@ -192,6 +295,5 @@ namespace AutomaticApi.Dynamic
                 controllerName = apiName;
             return $"{controllerName}Controller";
         }
-
     }
 }

@@ -1,4 +1,5 @@
 ﻿using AutomaticApi;
+using Microsoft.AspNetCore.Mvc;
 
 namespace TestApi.Api
 {

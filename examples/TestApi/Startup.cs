@@ -21,20 +21,15 @@ namespace TestApi
 
             services.AddAutomaticApi(op =>
             {
-                op.UseApiBehavior = false;
-                op.DefaultRouteTemplate = null;
-                op.ControllerAttributes.Add(new ApiControllerAttribute());
-                op.ControllerAttributes.Add(new RouteAttribute("api/[controller]"));
-
                 op.AddApi<IGeneralService<Student>, GenericService<Student>>(descriptor => descriptor.ControllerName = nameof(Student));
 
                 op.AddApi<IGeneralService<Class>, GenericService<Class>>(descriptor => descriptor.ControllerName = nameof(Class));
 
-                op.AddApi<IDemoAService, TestService>(descriptor => descriptor.ControllerBaseType = typeof(BaseController)); //only IDemoAService
+                //op.AddApi<IDemoAService, TestService>(descriptor => descriptor.ControllerBaseType = typeof(BaseController)); //only IDemoAService
 
-                op.AddApi<TestService>(); //Generate all api in TestService
+                //op.AddApi<TestService>(); //Generate all api in TestService
 
-                //op.AddAssembly(Assembly.GetEntryAssembly()); //Generate all api in Assembly
+                op.AddAssembly(Assembly.GetEntryAssembly()); //Generate all api in Assembly
             });
         }
 

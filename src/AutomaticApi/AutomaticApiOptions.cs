@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Linq.Expressions;
 using System.Reflection;
 
 namespace AutomaticApi
@@ -70,7 +71,7 @@ namespace AutomaticApi
         /// <summary>
         /// Dynamic Controller CustomAttributes
         /// </summary>
-        public ICollection<Attribute> ControllerAttributes { get; } = new HashSet<Attribute>();
+        public ICollection<Expression<Func<Attribute>>> ControllerAttributes { get; } = new HashSet<Expression<Func<Attribute>>>();
 
         /// <summary>
         /// Dynamic Controller parent type.

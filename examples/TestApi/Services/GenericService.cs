@@ -4,6 +4,11 @@ namespace TestApi.Services
 {
     public class GenericService<T> : IGeneralService<T> where T : new()
     {
+        public Task<bool> CopyAsync()
+        {
+            return Task.FromResult(true);
+        }
+
         public Task<bool> DeleteAsync(Guid id)
         {
             return Task.FromResult(true);
