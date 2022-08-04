@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq.Expressions;
+using System.Reflection;
 using System.Text;
 
 namespace AutomaticApi.Dynamic
@@ -37,6 +38,11 @@ namespace AutomaticApi.Dynamic
         /// Dynamic Controller CustomAttributes
         /// </summary>
         public ICollection<Expression<Func<Attribute>>> ControllerAttributes { get; } = new HashSet<Expression<Func<Attribute>>>();
+
+        /// <summary>
+        /// Suppress the ApiService methods
+        /// </summary>
+        public ICollection<MethodInfo> SuppressMethods { get; set; } = new HashSet<MethodInfo>();
 
         /// <summary>
         /// Suppress Global Dynamic Controller CustomAttributes

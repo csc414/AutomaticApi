@@ -111,7 +111,14 @@ namespace AutomaticApi.Dynamic
                     var parameterAttrDatas = parameter.GetCustomAttributesData();
                     foreach (var attr in parameterAttrDatas)
                         parameterBuilder.SetCustomAttribute(CreateAttribute(attr));
-                }
+                }              
+                
+                var attrDatas = method.GetCustomAttributesData();
+                foreach (var attr in attrDatas)
+                    methodBuilder.SetCustomAttribute(CreateAttribute(attr));
+
+                if (descriptor.SuppressMethods.Contains(method) && method.GetCustomAttribute<NonActionAttribute>() == null)
+                    methodBuilder.SetCustomAttribute(CreateAttribute<NonActionAttribute>());
 
                 var methodIL = methodBuilder.GetILGenerator();
                 methodIL.Emit(OpCodes.Ldarg_0);
@@ -120,10 +127,6 @@ namespace AutomaticApi.Dynamic
                     methodIL.Emit(OpCodes.Ldarg, parameter.Position + 1);
                 methodIL.Emit(OpCodes.Callvirt, method);
                 methodIL.Emit(OpCodes.Ret);
-
-                var attrDatas = method.GetCustomAttributesData();
-                foreach (var attr in attrDatas)
-                    methodBuilder.SetCustomAttribute(CreateAttribute(attr));
 
                 #region Routing
                 var methodAttrbutes = method.GetCustomAttributes();
