@@ -2,8 +2,11 @@
 using Microsoft.AspNetCore.Mvc.Infrastructure;
 using Microsoft.AspNetCore.Mvc.Routing;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Options;
 using System;
+using System.Collections;
+using System.Collections.Generic;
+using System.Collections.ObjectModel;
+using System.ComponentModel;
 using System.Linq;
 using System.Linq.Expressions;
 using System.Reflection;
@@ -100,6 +103,11 @@ namespace AutomaticApi.Dynamic
             ctorIL.Emit(OpCodes.Ret);
 
             var methods = definedType.GetTypeInfo().DeclaredMethods.Concat(definedType.GetInterfaces().SelectMany(o => o.GetTypeInfo().DeclaredMethods)).ToArray();
+            var supressMethods = new HashSet<MethodInfo>();
+            var supressMethodAttr = definedType.GetCustomAttribute<SupressMethodAttribute>();
+            if (supressMethodAttr != null)
+                supressMethods = methods.Where(o => supressMethodAttr.MethodNames.Contains(o.Name)).ToHashSet();
+
             foreach (var method in methods)
             {
                 var parameters = method.GetParameters();
@@ -117,7 +125,7 @@ namespace AutomaticApi.Dynamic
                 foreach (var attr in attrDatas)
                     methodBuilder.SetCustomAttribute(CreateAttribute(attr));
 
-                if (descriptor.SuppressMethods.Contains(method) && method.GetCustomAttribute<NonActionAttribute>() == null)
+                if ((descriptor.SuppressMethods.Contains(method) || supressMethods.Contains(method) || method.GetCustomAttribute<SupressMethodAttribute>() != null) && method.GetCustomAttribute<NonActionAttribute>() == null)
                     methodBuilder.SetCustomAttribute(CreateAttribute<NonActionAttribute>());
 
                 var methodIL = methodBuilder.GetILGenerator();
@@ -205,7 +213,12 @@ namespace AutomaticApi.Dynamic
         {
             var fields = attrData.NamedArguments.Where(o => o.IsField);
             var properties = attrData.NamedArguments.Where(o => !o.IsField);
-            return new CustomAttributeBuilder(attrData.Constructor, attrData.ConstructorArguments.Select(o => o.Value).ToArray(), properties.Select(o => (PropertyInfo)o.MemberInfo).ToArray(), properties.Select(o => o.TypedValue.Value).ToArray(), fields.Select(o => (FieldInfo)o.MemberInfo).ToArray(), fields.Select(o => o.TypedValue.Value).ToArray());
+            return new CustomAttributeBuilder(attrData.Constructor, attrData.ConstructorArguments.Select(o => {
+                if(o.Value is ReadOnlyCollection<CustomAttributeTypedArgument> args)
+                    return args.Select(o => o.Value).ToArray();
+
+                return o.Value;
+            }).ToArray(), properties.Select(o => (PropertyInfo)o.MemberInfo).ToArray(), properties.Select(o => o.TypedValue.Value).ToArray(), fields.Select(o => (FieldInfo)o.MemberInfo).ToArray(), fields.Select(o => o.TypedValue.Value).ToArray());
         }
 
         CustomAttributeBuilder CreateAttribute(LambdaExpression lambda)

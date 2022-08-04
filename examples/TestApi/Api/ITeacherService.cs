@@ -1,10 +1,12 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using AutomaticApi;
 using TestApi.Entities;
 
 namespace TestApi.Api
 {
-    public interface ITeacherService : IGeneralService<Student>
+    [SupressMethod("InsertAsync", "UpdateAsync")]
+    public interface ITeacherService : IGeneralService<Teacher>
     {
-        Task<bool> CopyAsync();
+        [SupressMethod]
+        Task<bool> TeachAsync();
     }
 }

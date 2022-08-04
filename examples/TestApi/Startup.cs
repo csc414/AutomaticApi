@@ -24,7 +24,7 @@ namespace TestApi
                 op.AddApi<IGeneralService<Student>, GenericService<Student>>(descriptor =>
                 {
                     descriptor.ControllerName = nameof(Student);
-                    descriptor.SuppressMethods.Add(typeof(IGeneralService<Student>).GetTypeInfo().DeclaredMethods.First());
+                    descriptor.SuppressMethods.Add(typeof(IGeneralService<Student>).GetTypeInfo().DeclaredMethods.Last());
                 });
 
                 op.AddApi<IGeneralService<Class>, GenericService<Class>>(descriptor => descriptor.ControllerName = nameof(Class));
