@@ -1,4 +1,5 @@
 ﻿using Microsoft.AspNetCore.Mvc.ApplicationModels;
+using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 
@@ -14,9 +15,15 @@ namespace AutomaticApi.Dynamic
             {
                 if (typeof(IAutomaticApi).IsAssignableFrom(controllerModel.ControllerType))
                 {
-                    var methods = controllerModel.ControllerType.GetInterfaces().SelectMany(o => o.GetTypeInfo().DeclaredMethods).ToDictionary(o => o.ToString());
+                    var methodMaps = new Dictionary<MethodInfo, MethodInfo>();
+                    foreach (var item in controllerModel.ControllerType.ImplementedInterfaces)
+                    {
+                        var mapping = controllerModel.ControllerType.GetInterfaceMap(item);
+                        for (int i = 0; i < mapping.InterfaceMethods.Length; i++)
+                            methodMaps.TryAdd(mapping.TargetMethods[i], mapping.InterfaceMethods[i]);
+                    }
                     foreach (var actionModel in controllerModel.Actions)
-                        _actionMethodField.SetValue(actionModel, methods[actionModel.ActionMethod.ToString()]);
+                        _actionMethodField.SetValue(actionModel, methodMaps[actionModel.ActionMethod]);
                 }
             }
         }

@@ -3,10 +3,8 @@ using Microsoft.AspNetCore.Mvc.Infrastructure;
 using Microsoft.AspNetCore.Mvc.Routing;
 using Microsoft.Extensions.DependencyInjection;
 using System;
-using System.Collections;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
-using System.ComponentModel;
 using System.Linq;
 using System.Linq.Expressions;
 using System.Reflection;
@@ -233,9 +231,27 @@ namespace AutomaticApi.Dynamic
             if (memberInitExp == null)
                 return new CustomAttributeBuilder(newExp.Constructor, constructorArgs);
 
-            var memberInfos = memberInitExp.Bindings.Where(o => o.Member.MemberType == MemberTypes.Property && o.BindingType == MemberBindingType.Assignment).Select(o => (Property: (PropertyInfo)o.Member, Value: GetValue(((MemberAssignment)o).Expression))).ToArray();
-            
-            return new CustomAttributeBuilder(newExp.Constructor, constructorArgs, memberInfos.Select(o => o.Property).ToArray(), memberInfos.Select(o => o.Value).ToArray());
+            var propertyInfos = new PropertyInfo[0];
+            var propertyValues = new object[0];
+            var fieldInfos = new FieldInfo[0];
+            var fieldValues = new object[0];
+
+            foreach (var item in memberInitExp.Bindings.Where(o => o.BindingType == MemberBindingType.Assignment).GroupBy(o => o.Member.MemberType))
+            {
+                switch (item.Key)
+                {
+                    case MemberTypes.Property:
+                        propertyInfos = item.Select(o => (PropertyInfo)o.Member).ToArray();
+                        propertyValues = item.Select(o => GetValue(((MemberAssignment)o).Expression)).ToArray();
+                        break;
+                    case MemberTypes.Field:
+                        fieldInfos = item.Select(o => (FieldInfo)o.Member).ToArray();
+                        fieldValues = item.Select(o => GetValue(((MemberAssignment)o).Expression)).ToArray();
+                        break;
+                }
+            }
+
+            return new CustomAttributeBuilder(newExp.Constructor, constructorArgs, propertyInfos, propertyValues, fieldInfos, fieldValues);
         }
 
         object GetValue(Expression expression)
