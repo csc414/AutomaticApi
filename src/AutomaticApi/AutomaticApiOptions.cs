@@ -104,6 +104,16 @@ namespace AutomaticApi
         }
 
         /// <summary>
+        /// Add Entry Assembly.
+        /// </summary>
+        /// <param name="predicate"></param>
+        /// <returns></returns>
+        public AutomaticApiOptions AddEntryAssembly(Func<AutomaticApiDescriptor, bool> predicate = null)
+        {
+            return AddAssembly(Assembly.GetEntryAssembly(), predicate);
+        }
+
+        /// <summary>
         /// Add Implementation Type.
         /// </summary>
         /// <typeparam name="TImplementation"></typeparam>

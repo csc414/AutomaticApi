@@ -7,7 +7,7 @@ namespace TestApi.Services
     {
         public string Get()
         {
-            return "Hello AutomaticApi";
+            return "Hello AutomaticApi " + Environment.OSVersion;
         }
 
         public Task<string> FetchAsync(Guid id)

@@ -21,20 +21,26 @@ namespace TestApi
 
             services.AddAutomaticApi(op =>
             {
-                op.AddApi<IGeneralService<Student>, GenericService<Student>>(descriptor =>
-                {
-                    descriptor.ControllerName = nameof(Student);
-                    descriptor.SuppressMethods.Add(typeof(IGeneralService<Student>).GetTypeInfo().DeclaredMethods.Last());
-                });
+                //op.AddApi<IGeneralService<Student>, GenericService<Student>>(descriptor =>
+                //{
+                //    descriptor.ControllerName = nameof(Student);
+                //    descriptor.SuppressMethods.Add(typeof(IGeneralService<Student>).GetTypeInfo().DeclaredMethods.Last());
+                //});
 
-                op.AddApi<IGeneralService<Class>, GenericService<Class>>(descriptor => descriptor.ControllerName = nameof(Class));
+                //op.AddApi<IGeneralService<Class>, GenericService<Class>>(descriptor => descriptor.ControllerName = nameof(Class));
 
                 //op.AddApi<IDemoAService, TestService>(descriptor => descriptor.ControllerBaseType = typeof(BaseController)); //only IDemoAService
 
                 //op.AddApi<TestService>(); //Generate all api in TestService
 
-                op.AddAssembly(Assembly.GetEntryAssembly()); //Generate all api in Assembly
+                //op.AddAssembly(Assembly.GetEntryAssembly()); //Generate all api in Assembly
+
+                op.AddEntryAssembly();
             });
+
+            //register lifetime
+            services.AddScoped<IDemoAService, TestService>();
+            services.AddScoped<IDemoBService, TestService>();
         }
 
         public void Configure(IApplicationBuilder app, IWebHostEnvironment env)

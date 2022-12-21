@@ -2,13 +2,15 @@
 using AutomaticApi.Dynamic;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Options;
 using System;
 
 namespace Microsoft.Extensions.DependencyInjection
 {
     public static class ServiceCollectionExtensions
     {
-        private static readonly AutomaticApiOptions _options = new AutomaticApiOptions();
+        internal static AutomaticApiOptions Options { get; } = new AutomaticApiOptions();
 
         internal static DynamicControllerBuilder ControllerBuilder { get; private set; }
 
@@ -20,10 +22,10 @@ namespace Microsoft.Extensions.DependencyInjection
                 services
                     .AddControllers(op => op.Conventions.Add(new AutomaticApiConvention()))
                     .AddApplicationPart(ControllerBuilder.GetAssembly());
-                services.PostConfigure<MvcOptions>(op => ControllerBuilder.AddControllersFromOptions(_options));
+                services.AddSingleton<IPostConfigureOptions<MvcOptions>, MvcOptionsPostConfigureOptions>();
             }
 
-            setupAction?.Invoke(_options);
+            setupAction?.Invoke(Options);
             return services;
         }
     }

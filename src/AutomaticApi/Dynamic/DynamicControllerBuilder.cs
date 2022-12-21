@@ -15,13 +15,17 @@ namespace AutomaticApi.Dynamic
 {
     internal sealed class DynamicControllerBuilder
     {
-        private readonly MethodInfo _getServiceOrCreateInstance = typeof(ActivatorUtilities).GetTypeInfo().DeclaredMethods.First(o => o.Name.Equals("GetServiceOrCreateInstance"));
+        private readonly MethodInfo _emptyArray = typeof(Array).GetTypeInfo().DeclaredMethods.First(o => o.Name.Equals("Empty") && o.IsGenericMethod).MakeGenericMethod(typeof(Object));
+
+        private readonly MethodInfo _createInstance = typeof(ActivatorUtilities).GetTypeInfo().DeclaredMethods.First(o => o.Name.Equals("CreateInstance") && o.IsGenericMethod);
 
         private readonly AssemblyBuilder _ab;
 
         private readonly ModuleBuilder _mb;
 
         private AutomaticApiOptions _options;
+
+        private IServiceProvider _provider;
 
         private Regex _controllerNameRegex;
 
@@ -90,13 +94,19 @@ namespace AutomaticApi.Dynamic
 
             var serviceField = controllerBuilder.DefineField("_service", definedType, FieldAttributes.Private);
 
-            var ctorBuilder = controllerBuilder.DefineConstructor(MethodAttributes.Public, CallingConventions.Standard, new[] { typeof(IServiceProvider) });
+            var service = _provider.GetService(definedType);
+            var parameterType = service == null ? typeof(IServiceProvider) : definedType;
+            var ctorBuilder = controllerBuilder.DefineConstructor(MethodAttributes.Public, CallingConventions.Standard, new[] { parameterType });
             var ctorIL = ctorBuilder.GetILGenerator();
             ctorIL.Emit(OpCodes.Ldarg_0);
             ctorIL.Emit(OpCodes.Call, typeof(object).GetConstructor(Type.EmptyTypes));
             ctorIL.Emit(OpCodes.Ldarg_0);
             ctorIL.Emit(OpCodes.Ldarg_1);
-            ctorIL.Emit(OpCodes.Call, _getServiceOrCreateInstance.MakeGenericMethod(implementationType));
+            if (service == null)
+            {
+                ctorIL.Emit(OpCodes.Call, _emptyArray);
+                ctorIL.Emit(OpCodes.Call, _createInstance.MakeGenericMethod(implementationType));
+            }
             ctorIL.Emit(OpCodes.Stfld, serviceField);
             ctorIL.Emit(OpCodes.Ret);
 
@@ -180,9 +190,12 @@ namespace AutomaticApi.Dynamic
             controllerBuilder.CreateType();
         }
 
-        public void AddControllersFromOptions(AutomaticApiOptions options)
+        public void AddControllersFromOptions(AutomaticApiOptions options, IServiceProvider serviceProvider)
         {
+            using var scope = serviceProvider.CreateScope();
             _options = options;
+
+            _provider = scope.ServiceProvider;
 
             _controllerNameRegex = new Regex($"^(?:I)(.+?)(?:{string.Join("|", options.AllowedNameSuffixes)})?$", RegexOptions.CultureInvariant | RegexOptions.Singleline | RegexOptions.Compiled);
 
