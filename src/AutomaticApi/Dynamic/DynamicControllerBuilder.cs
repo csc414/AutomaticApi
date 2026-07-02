@@ -33,6 +33,13 @@ namespace AutomaticApi.Dynamic
 
         private Regex _routeRegex;
 
+        /// <summary>
+        /// 全局 ControllerAttributes 预编译缓存：每个 lambda 只 Compile() 一次，
+        /// 避免在 AddController 中为每个 descriptor 重复编译表达式树。
+        /// Item1 = 实例（用于 IRouteTemplateProvider / IApiBehaviorMetadata 判断），Item2 = 用于 Emit 的 builder。
+        /// </summary>
+        private (Attribute Instance, CustomAttributeBuilder Builder)[] _globalAttrs;
+
         public DynamicControllerBuilder(string assemblyName)
         {
             AssemblyName name = new AssemblyName(assemblyName);
@@ -53,33 +60,36 @@ namespace AutomaticApi.Dynamic
                 return;
 
             var controllerBuilder = _mb.DefineType(controllerName, TypeAttributes.Public, descriptor.ControllerBaseType ?? _options.ControllerBaseType, new[] { definedType });
-            var typeAttributes = definedType.GetInterfaces().SelectMany(o => o.GetCustomAttributes())
-                .Concat(definedType.GetCustomAttributes())
-                .Concat(descriptor.ControllerAttributes.Select(o => o.Compile().Invoke()))
-                .ToArray();
+
+            // descriptor 级属性每个 lambda 只编译/解析一次，同时拿到实例（用于判断）和 builder（用于 Emit）。
+            var descriptorAttrs = CompileAttributes(descriptor.ControllerAttributes);
+
+            var typeAttributes = new List<Attribute>(
+                definedType.GetInterfaces().SelectMany(o => o.GetCustomAttributes())
+                    .Concat(definedType.GetCustomAttributes()));
+            typeAttributes.AddRange(descriptorAttrs.Select(o => o.Instance));
+            if (!descriptor.SuppressGlobalControllerAttributes)
+                typeAttributes.AddRange(_globalAttrs.Select(o => o.Instance));
+
             var typeAttributeDatas = definedType.GetInterfaces().SelectMany(o => o.GetCustomAttributesData()).Concat(definedType.GetCustomAttributesData()).ToArray();
             foreach (var attrData in typeAttributeDatas)
             {
                 controllerBuilder.SetCustomAttribute(CreateAttribute(attrData));
             }
 
-            if(!descriptor.SuppressGlobalControllerAttributes)
+            foreach (var (_, builder) in descriptorAttrs)
             {
-                typeAttributes = typeAttributes.Concat(_options.ControllerAttributes.Select(o => o.Compile().Invoke())).ToArray();
-
-                foreach (var item in _options.ControllerAttributes)
-                {
-                    var attr = CreateAttribute(item);
-                    if(attr != null)
-                        controllerBuilder.SetCustomAttribute(attr);
-                }
+                if (builder != null)
+                    controllerBuilder.SetCustomAttribute(builder);
             }
 
-            foreach (var item in descriptor.ControllerAttributes)
+            if (!descriptor.SuppressGlobalControllerAttributes)
             {
-                var attr = CreateAttribute(item);
-                if (attr != null)
-                    controllerBuilder.SetCustomAttribute(attr);
+                foreach (var (_, builder) in _globalAttrs)
+                {
+                    if (builder != null)
+                        controllerBuilder.SetCustomAttribute(builder);
+                }
             }
 
             if (!descriptor.SuppressDefaultRouteTemplate && !string.IsNullOrWhiteSpace(_options.DefaultRouteTemplate) && !typeAttributes.Any(o => o is IRouteTemplateProvider p && p.Template != null))
@@ -203,6 +213,9 @@ namespace AutomaticApi.Dynamic
 
             _routeRegex = new Regex("[A-Z]{0,1}[a-z0-9]+", RegexOptions.CultureInvariant | RegexOptions.Singleline | RegexOptions.Compiled);
 
+            // 全局属性一次性编译缓存，供每个 AddController 复用。
+            _globalAttrs = CompileAttributes(_options.ControllerAttributes).ToArray();
+
             foreach (var descriptor in _options.AllowedDescriptors)
                 AddController(descriptor);
         }
@@ -230,6 +243,21 @@ namespace AutomaticApi.Dynamic
 
                 return o.Value;
             }).ToArray(), properties.Select(o => (PropertyInfo)o.MemberInfo).ToArray(), properties.Select(o => o.TypedValue.Value).ToArray(), fields.Select(o => (FieldInfo)o.MemberInfo).ToArray(), fields.Select(o => o.TypedValue.Value).ToArray());
+        }
+
+        /// <summary>
+        /// 将一组属性表达式一次性编译：Compile().Invoke() 得到实例，CreateAttribute 得到 Emit 用的 builder。
+        /// 调用方据此避免对同一组表达式重复 Compile 与重复解析。
+        /// </summary>
+        private (Attribute Instance, CustomAttributeBuilder Builder)[] CompileAttributes(IEnumerable<LambdaExpression> source)
+        {
+            if (source == null)
+                return Array.Empty<(Attribute, CustomAttributeBuilder)>();
+
+            var list = new List<(Attribute, CustomAttributeBuilder)>();
+            foreach (var expr in source)
+                list.Add(((Attribute)expr.Compile().DynamicInvoke(), CreateAttribute(expr)));
+            return list.ToArray();
         }
 
         CustomAttributeBuilder CreateAttribute(LambdaExpression lambda)
